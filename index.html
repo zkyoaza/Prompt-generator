@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Generator Prompt</title>
+<style>
+:root{--bg:#f3f1f8;--sf:#fff;--tx:#1b1630;--mu:#6b6684;--ac:#5b3fd9;--on:#fff;--ln:#dcd7ec;--hl:#ffc46b}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1a2a;--sf:#17283e;--tx:#eef0f7;--mu:#97a3ba;--ac:#b9a6ff;--on:#1a1240;--ln:#2a3d57}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+main{max-width:640px;margin:0 auto;padding:20px 16px 40px}
+h1{font:700 26px/1.2 Georgia,serif;margin:0 0 4px}
+.sub{color:var(--mu);margin:0 0 18px;font-size:14px}
+.tabs{display:flex;gap:6px;background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:4px;margin-bottom:18px}
+.tabs button{flex:1;border:0;background:none;color:var(--mu);font:600 15px inherit;font-family:inherit;padding:10px;border-radius:10px;cursor:pointer}
+.tabs button.on{background:var(--ac);color:var(--on)}
+label,.lb{display:block;font-weight:600;font-size:14px;margin:16px 0 6px}
+textarea,input[type=text]{width:100%;background:var(--sf);color:var(--tx);border:1px solid var(--ln);border-radius:12px;padding:12px;font:inherit;resize:vertical}
+textarea:focus,input:focus,button:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--ln);background:var(--sf);color:var(--tx);border-radius:999px;padding:7px 13px;font:14px inherit;font-family:inherit;cursor:pointer}
+.chip.on{background:var(--ac);border-color:var(--ac);color:var(--on);font-weight:600}
+.row{display:flex;gap:10px;margin-top:22px}
+.btn{flex:1;border:0;border-radius:12px;padding:14px;font:700 16px inherit;font-family:inherit;cursor:pointer;background:var(--ac);color:var(--on)}
+.btn.sec{background:var(--sf);color:var(--tx);border:1px solid var(--ln);flex:0 0 auto;padding:14px 18px}
+#out{margin-top:22px;display:none}
+#out textarea{min-height:170px;border-color:var(--hl);border-width:2px}
+.hint{font-size:13px;color:var(--mu);margin-top:6px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+.vid{display:none}
+body.video .vid{display:block}
+body.video .img{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>Generator Prompt</h1>
+  <p class="sub">Susun prompt gambar dan video dari pilihan. Tanpa internet.</p>
+
+  <div class="tabs" role="tablist">
+    <button id="tImg" class="on" onclick="setMode('image')">Gambar</button>
+    <button id="tVid" onclick="setMode('video')">Video</button>
+  </div>
+
+  <label for="subjek">Subjek</label>
+  <textarea id="subjek" rows="2" placeholder="Contoh: kucing oren duduk di jendela kafe saat hujan"></textarea>
+  <div class="hint">Tulis dalam bahasa apa saja. Hasil prompt dalam bahasa Inggris agar lebih akurat di sebagian besar generator.</div>
+
+  <div id="groups"></div>
+
+  <label for="extra">Detail tambahan (opsional)</label>
+  <input type="text" id="extra" placeholder="Contoh: bokeh lampu kota, detail bulu halus">
+
+  <div class="row">
+    <button class="btn" onclick="generate()">Buat prompt</button>
+    <button class="btn sec" onclick="randomize()">Acak</button>
+  </div>
+
+  <section id="out">
+    <label for="hasil">Hasil prompt</label>
+    <textarea id="hasil" readonly></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" onclick="copyText('hasil')">Salin prompt</button>
+    </div>
+    <div class="img" id="negWrap">
+      <label for="neg">Negative prompt</label>
+      <textarea id="neg" rows="2" readonly></textarea>
+      <div class="row" style="margin-top:12px"><button class="btn sec" style="flex:1" onclick="copyText('neg')">Salin negative prompt</button></div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast">Tersalin</div>
+
+<script>
+// [id, judul, mode ('both'|'image'|'video'), opsi [label, teks prompt]]
+var G=[
+ ['gaya','Gaya','both',[['Fotorealistis','photorealistic, ultra detailed'],['Sinematik','cinematic, film still'],['Anime','anime style, vibrant colors'],['3D render','3D render, octane render'],['Cat air','watercolor painting'],['Ilustrasi digital','digital illustration, concept art'],['Pixar','stylized 3D animation, Pixar style'],['Retro 80an','retro 80s synthwave aesthetic']]],
+ ['cahaya','Pencahayaan','both',[['Golden hour','golden hour lighting'],['Lembut','soft diffused light'],['Dramatis','dramatic lighting, strong shadows'],['Neon','neon lights, glowing'],['Studio','studio lighting, softbox'],['Malam','moody night lighting'],['Kabut','volumetric fog, god rays']]],
+ ['sudut','Sudut kamera','image',[['Close-up','close-up shot'],['Setengah badan','medium shot'],['Seluruh badan','full body shot'],['Dari atas','top-down view'],['Dari bawah','low angle shot'],['Lebar','wide angle shot'],['Makro','macro photography']]],
+ ['mood','Suasana','both',[['Hangat','warm and cozy mood'],['Misterius','mysterious atmosphere'],['Ceria','joyful, bright mood'],['Tenang','calm, serene'],['Epik','epic and grand'],['Melankolis','melancholic mood']]],
+ ['gerak','Gerakan kamera','video',[['Diam (tripod)','static camera'],['Zoom in','slow zoom in'],['Zoom out','slow zoom out'],['Pan kiri-kanan','smooth pan left to right'],['Dolly maju','dolly forward'],['Orbit','camera orbits around the subject'],['Drone','aerial drone shot'],['Handheld','handheld camera, slight shake']]],
+ ['aksi','Gerakan subjek','video',[['Pelan','slow, gentle movement'],['Natural','natural realistic movement'],['Cepat','fast dynamic action'],['Slow motion','slow motion'],['Rambut/kain tertiup angin','hair and clothes blowing in the wind']]],
+ ['durasi','Durasi','video',[['5 detik','5 seconds'],['8 detik','8 seconds'],['10 detik','10 seconds']]],
+ ['kualitas','Kualitas','both',[['4K','4K resolution'],['8K','8K, highly detailed'],['Tajam','sharp focus']]],
+ ['rasio','Rasio','both',[['1:1','1:1'],['16:9','16:9'],['9:16','9:16'],['4:3','4:3'],['3:4','3:4']]]
+];
+var mode='image', sel={};
+
+function build(){
+  var h='';
+  G.forEach(function(g){
+    var cls=g[2]==='both'?'':(g[2]==='image'?'img':'vid');
+    h+='<div class="'+cls+'"><div class="lb">'+g[1]+'</div><div class="chips" data-g="'+g[0]+'">';
+    g[3].forEach(function(o,i){h+='<button type="button" class="chip" data-i="'+i+'">'+o[0]+'</button>'});
+    h+='</div></div>';
+  });
+  document.getElementById('groups').innerHTML=h;
+  document.querySelectorAll('.chips').forEach(function(c){
+    c.addEventListener('click',function(e){
+      var b=e.target.closest('.chip'); if(!b)return;
+      var id=c.dataset.g, i=+b.dataset.i;
+      if(sel[id]===i){delete sel[id]}else{sel[id]=i}
+      paint();
+    });
+  });
+}
+function paint(){
+  document.querySelectorAll('.chips').forEach(function(c){
+    c.querySelectorAll('.chip').forEach(function(b){
+      b.classList.toggle('on',sel[c.dataset.g]===+b.dataset.i);
+    });
+  });
+}
+function setMode(m){
+  mode=m;
+  document.body.classList.toggle('video',m==='video');
+  document.getElementById('tImg').classList.toggle('on',m==='image');
+  document.getElementById('tVid').classList.toggle('on',m==='video');
+  document.getElementById('out').style.display='none';
+}
+function valid(g){return g[2]==='both'||g[2]===mode}
+function randomize(){
+  G.forEach(function(g){
+    if(!valid(g))return;
+    sel[g[0]]=Math.floor(Math.random()*g[3].length);
+  });
+  paint();generate();
+}
+function generate(){
+  var s=document.getElementById('subjek').value.trim();
+  if(!s){toast('Isi subjek dulu');document.getElementById('subjek').focus();return}
+  var parts=[s],ratio='',dur='';
+  G.forEach(function(g){
+    if(!valid(g)||sel[g[0]]===undefined)return;
+    var t=g[3][sel[g[0]]][1];
+    if(g[0]==='rasio'){ratio=t}
+    else if(g[0]==='durasi'){dur=t}
+    else parts.push(t);
+  });
+  var ex=document.getElementById('extra').value.trim();
+  if(ex)parts.push(ex);
+  var txt=parts.join(', ');
+  if(mode==='video'){
+    if(dur)txt+='. Duration: '+dur;
+    if(ratio)txt+='. Aspect ratio: '+ratio;
+    txt+='. Smooth consistent motion, no flicker';
+    document.getElementById('negWrap').style.display='none';
+  }else{
+    if(ratio)txt+=' --ar '+ratio;
+    document.getElementById('negWrap').style.display='block';
+    document.getElementById('neg').value='blurry, low quality, deformed, extra fingers, bad anatomy, watermark, text, cropped';
+  }
+  document.getElementById('hasil').value=txt;
+  var o=document.getElementById('out');o.style.display='block';
+  o.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function copyText(id){
+  var el=document.getElementById(id);
+  var done=function(){toast('Tersalin')};
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(el.value).then(done,fb);return}
+  }catch(e){}
+  fb();
+  function fb(){el.focus();el.select();try{document.execCommand('copy');done()}catch(e){toast('Tekan lama lalu salin')}}
+}
+function toast(m){
+  var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show')},1600);
+}
+build();
+</script>
+</body>
+</html>
